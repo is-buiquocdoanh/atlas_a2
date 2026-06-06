@@ -23,4 +23,14 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+install(DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}/
+)
+
+install(PROGRAMS
+  scripts/battery_node.py
+  scripts/collision_detect_node.py
+  scripts/mag_sensor_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 ament_package()

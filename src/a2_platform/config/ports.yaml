@@ -1,0 +1,21 @@
+# =============================================================
+#  a2_platform — cấu hình cổng kết nối
+#  Chỉnh sửa file này khi cắm thiết bị vào cổng USB khác.
+#  Sau khi sửa: colcon build --packages-select a2_platform
+# =============================================================
+
+battery_node:
+  ros__parameters:
+    port:     /dev/ttyUSB1
+    baudrate: 9600
+    slave_id: 1
+
+collision_detect:
+  ros__parameters:
+    serial_port: /dev/ttyUSB2
+    baudrate:    115200
+
+mag_sensor_node:
+  ros__parameters:
+    port:     /dev/ttyUSB1
+    baudrate: 115200

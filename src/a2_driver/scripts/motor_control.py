@@ -140,14 +140,15 @@ def stop_motor(dev: USBCanA, node_id: int) -> Optional[CanFrame]:
     return transact(dev, node_id, hex_bytes("00 1A 00 00 00 FF 00 00"), f"STOP MOTOR ID=0x{node_id:02X}")
 
 
-def read_encoder(dev: USBCanA, node_id: int) -> Optional[int]:
+def read_encoder(dev: USBCanA, node_id: int, response_timeout: float = RESPONSE_TIMEOUT) -> Optional[int]:
     """
     Read the 32-bit absolute encoder position from the motor controller.
 
     The response frame is decoded into a signed 32-bit value.
     Returns None on timeout or unexpected reply format.
+    Use a shorter response_timeout for real-time loops (e.g. 0.02).
     """
-    rx = transact(dev, node_id, hex_bytes("00 2A E8 00 00 E9 00 00"), f"READ ENCODER ID=0x{node_id:02X}")
+    _, rx = dev.transact(node_id, hex_bytes("00 2A E8 00 00 E9 00 00"), response_timeout=response_timeout)
     if rx is None:
         return None
 
@@ -203,7 +204,7 @@ def twist_to_rpm(vx: float, omega: float) -> Tuple[int, int]:
 
 
 def main() -> None:
-    from odom import Odometry, OdomState  # only needed for CLI test mode
+    from odom import Odometry, OdomState
     print("[INFO] Bat dau chuong trinh motor_control")
 
     odom = Odometry(
