@@ -23,7 +23,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(DIRECTORY launch models
+install(DIRECTORY launch models config urdf
   DESTINATION share/${PROJECT_NAME}/
 )
 

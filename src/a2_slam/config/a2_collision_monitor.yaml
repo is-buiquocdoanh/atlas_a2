@@ -19,16 +19,9 @@ collision_monitor:
     polygons: ["PolygonStop", "PolygonSlow", "FootprintApproach"]
     PolygonStop:
       type: "polygon"
-      points: [
-        0.0,   0.27,   # Điểm 1: Bên trái robot (90 độ)
-        0.135, 0.234,  # Điểm 2: Góc 60 độ  (0.27 * cos(60), 0.27 * sin(60))
-        0.234, 0.135,  # Điểm 3: Góc 30 độ  (0.27 * cos(30), 0.27 * sin(30))
-        0.27,  0.0,    # Điểm 4: Chính giữa phía trước (0 độ)
-        0.234, -0.135, # Điểm 5: Góc -30 độ (0.27 * cos(-30), 0.27 * sin(-30))
-        0.135, -0.234, # Điểm 6: Góc -60 độ (0.27 * cos(-60), 0.27 * sin(-60))
-        0.0,   -0.27,  # Điểm 7: Bên phải robot (-90 độ)
-        0.0,   0.0     # Điểm 8: Gốc tọa độ để đóng tâm hình tròn
-      ]
+      # Robot footprint 0.9x0.46m + margin 0.05m → 1.0x0.56m
+      # Thứ tự điểm: x1,y1, x2,y2, x3,y3, x4,y4 (ngược chiều kim đồng hồ)
+      points: [-0.50, -0.28, 0.50, -0.28, 0.50, 0.28, -0.50, 0.28]
       action_type: "stop"
       max_points: 3
       visualize: true
@@ -36,10 +29,11 @@ collision_monitor:
       enabled: true
     PolygonSlow:
       type: "polygon"
-      points: [0.4, 0.4, 0.4, -0.4, -0.4, -0.4, -0.4, 0.4]
+      # Robot footprint 0.9x0.46m + margin 0.30m → 1.5x1.06m
+      points: [-0.75, -0.53, 0.75, -0.53, 0.75, 0.53, -0.75, 0.53]
       action_type: "slowdown"
       max_points: 3
-      slowdown_ratio: 0.5 
+      slowdown_ratio: 0.5
       visualize: true
       polygon_pub_topic: "polygon_slowdown"
       enabled: true

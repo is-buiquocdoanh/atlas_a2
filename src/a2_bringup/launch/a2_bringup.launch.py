@@ -7,29 +7,21 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-
-    # RPLidar
-    rplidar_launch = IncludeLaunchDescription(
+    # Include platform launch file để khởi chạy các node liên quan đến phần cứng của robot (đọc cảm biến, v.v.)
+    platform_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory('rplidar_ros'),
-                'launch', 'rplidar_a2m12_launch.py'
-            )
+            os.path.join(get_package_share_directory('a2_platform'), 'launch', 'platform.launch.py')
         )
     )
 
-    # TF tĩnh: base_link → laser
-    # Chỉnh x y z và quaternion (qx qy qz qw) theo vị trí lắp lidar thực tế
-    tf_base_laser = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='static_tf_base_laser',
-        arguments=[
-            '0', '0', '0',      # x y z (m)
-            '0', '0', '1', '0', # qx qy qz qw  (180° quanh Z)
-            'base_link',
-            'laser',
-        ],
+    urdf = os.path.join(get_package_share_directory('a2_bringup'), 'urdf', 'a2_robot.urdf')
+    robot_description = open(urdf).read()
+
+    robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        parameters=[{'robot_description': robot_description}],
     )
 
     # Relay /scan → /atlas/scan_filtered
@@ -58,10 +50,52 @@ def generate_launch_description():
                 'freq': 30.0
             }],
         )
+    
+    camera_node = Node(
+        package='v4l2_camera',
+        executable='v4l2_camera_node',
+        name='usb_camera',
+        parameters=[
+            {"video_device": "/dev/video2"},
+            {"image_size": [352, 288]},
+            {"pixel_format": "YUYV"},
+            {"frame_rate": 30},
+        ]
+    )
+
+    republish_node = Node(
+        package='image_transport',
+        executable='republish',
+        name='republish_compressed',
+        arguments=['compressed', 'raw'],
+        remappings=[
+            ('in/compressed', '/image_raw/compressed'),
+            ('out', '/yolo_image_raw'),
+        ]
+    )
+    
+    joy_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('a2_bringup'), 'launch', 'joystick.launch.py')
+        )
+    )
+    
+    # driver 
+    driver_node = Node(
+        package='a2_driver',
+        executable='driver_node.py',
+        name='driver_node',
+        output='screen',
+        parameters=[{"port": "/dev/usbcan"}]
+    )
 
     return LaunchDescription([
-        rplidar_launch,
-        tf_base_laser,
+        # platform_launch,
+        robot_state_publisher,
         scan_relay,
         rf2o_node,
+        camera_node,
+        republish_node,
+        joy_launch,
+        driver_node,
     ])
