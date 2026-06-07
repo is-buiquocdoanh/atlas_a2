@@ -74,6 +74,18 @@ def generate_launch_description():
         ]
     )
     
+    web_video_server_node = Node(
+        package='web_video_server',
+        executable='web_video_server',
+        name='web_video_server',
+        parameters=[{
+            'port': 8080,          # Cổng để truy cập trên trình duyệt
+            'address': '0.0.0.0',  # Cho phép tất cả các IP trong mạng truy cập
+            'type': 'ros_compressed' # Ưu tiên dùng chuẩn nén để mượt hơn
+        }],
+        output='screen'
+    )
+    
     joy_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('a2_bringup'), 'launch', 'joystick.launch.py')
@@ -90,12 +102,13 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        # platform_launch,
+        platform_launch,
         robot_state_publisher,
         scan_relay,
         rf2o_node,
         camera_node,
         republish_node,
+        web_video_server_node,
         joy_launch,
         driver_node,
     ])

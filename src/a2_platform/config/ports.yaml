@@ -26,6 +26,6 @@ rplidar_node:
     serial_baudrate: 256000
     channel_type: serial
     frame_id: laser
-    inverted: true
+    inverted: false
     angle_compensate: true
     scan_mode: Sensitivity

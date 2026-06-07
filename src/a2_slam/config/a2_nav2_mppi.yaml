@@ -90,83 +90,69 @@ controller_server:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.2
       yaw_goal_tolerance: 0.2
-    # DWB parameters
     FollowPath:
-      # plugin: "nav2_rotation_shim_controller::RotationShimController"
-      # primary_controller: "nav2_mppi_controller::MPPIController"
-      # angular_dist_threshold: 0.785
-      # forward_sampling_distance: 0.6
-      # rotate_to_heading_angular_vel: 1.8
-      # max_angular_accel: 2.0
-      # simulate_ahead_time: 1.0
-      # rotate_to_goal_heading: false
-      plugin: "nav2_mppi_controller::MPPIController"
-      time_steps: 35 # số bước thời gian cho mô hình dự đoán, horizon(tầm nhìn tương lai)= time_steps*model_dt
-      model_dt: 0.05 # bước thời gian của mô hình dự đoán =1/controller_frequency
-      batch_size: 3000 # số lượng mẫu đường đi tiềm năng được đánh giá trong mỗi lần lập kế hoạch
-      iteration_count: 1 # số lần lặp lại quá trình lập kế hoạch MPPI trong mỗi chu kỳ điều khiển, thường được đặt thành 1 để cân bằng giữa hiệu suất và khả năng phản hồi của robot.
-      temperature: 0.3 # tham số điều chỉnh độ ngẫu nhiên của quá trình lập kế hoạch MPPI
-      gamma: 0.015 # hệ số giảm giá trong MPPI, ảnh hưởng đến cách robot đánh giá chi phí của các đường đi tiềm năng trong tương lai, giúp robot ưu tiên các hành động ngắn hạn hơn hoặc dài hạn hơn tùy thuộc vào giá trị được đặt.
-      prune_distance: 1.7 # khoảng cách mà MPPI sẽ cắt bỏ các đường đi tiềm năng không còn phù hợp với vị trí hiện tại của robot, giúp cải thiện hiệu suất lập kế hoạch bằng cách tập trung vào các đường đi có khả năng thực hiện được hơn.
-      transform_tolerance: 0.2 # thời gian tối đa (tính bằng giây) mà MPPI sẽ chờ đợi để nhận được các phép biến đổi cần thiết giữa các khung tham chiếu, giúp đảm bảo rằng robot có thông tin chính xác về vị trí và hướng của nó khi lập kế hoạch đường đi.
-      vx_std: 0.3 # Độ lệch chuẩn cho tốc độ tuyến tính theo trục x, giúp robot đánh giá nhiều đường cong tiềm năng hơn, cải thiện khả năng lập kế hoạch và tránh chướng ngại vật của robot, đặc biệt là trong môi trường có nhiều chướng ngại vật hoặc khi robot có kích thước lớn.
-      vy_std: 0.0
-      wz_std: 0.3 
-      vx_max: 0.7
-      vx_min: 0.0
-      vy_max: 0.0 
-      wz_max: 2.0
-      ax_max: 1.0    # Gia tốc tuyến tính tối đa (m/s²) 
-      ax_min: -4.0   # Gia tốc tuyến tính tối thiểu (m/s²) - cho phép lùi
-      az_max: 1.0    # Gia tốc góc tối đa (rad/s²)
-      az_min: -4.0   # Gia tốc góc tối thiểu (rad/s²)
-      motion_model: "DiffDrive"
-      visualize: false
-      critics: ["ObstaclesCritic","ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
-      ObstaclesCritic:
-        enabled: true
-        cost_power: 1 # Số mũ của hàm chi phí.Nếu tăng lên 2 hoặc 3: Chi phí sẽ tăng vọt (theo đường cong) khi lại gần. Điều này giúp robot chạy thoải mái ở xa nhưng "phanh cực gắt" khi đến gần.
-        repulsion_weight: 1.5 # Đây là lực đẩy. Nó tạo ra một vùng chi phí giảm dần xung quanh vật cản. Trọng số này càng cao, robot càng có xu hướng giữ khoảng cách xa vật cản.
-        critical_weight: 20.0 # trọng số này sẽ áp đặt một mức phạt rất nặng để ép robot phải phanh gấp hoặc bẻ lái ngay lập tức
-        consider_footprint: false
-        collision_cost: 10000.0 # Với con số 10,000, MPPI sẽ gần như loại bỏ hoàn toàn các quỹ đạo đó khỏi lựa chọn.
-        collision_margin_distance: 0.1 # bất kỳ điểm nào nằm trong khoảng này sẽ được oi là va chạm
-        near_goal_distance: 0.5 # Khi robot ở gần mục tiêu, nó có thể chấp nhận rủi ro hơn để đạt được mục tiêu nhanh hơn. Khoảng cách này xác định khi nào điều đó xảy ra.
-        inflation_radius: 0.3 # (only in Humble)
-        cost_scaling_factor: 10.0 # (only in Humble)   
-      ConstraintCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 4.0
-      GoalCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0
-        threshold_to_consider: 1.4
-      GoalAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.0
-        threshold_to_consider: 0.5
-      PathAlignCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 4.0
-        threshold_to_consider: 1.2
-      PathFollowCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 9.0
-        threshold_to_consider: 0.5
-      PathAngleCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 2.0
-      PreferForwardCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 2.0
-        forward_bias: 0.75
+      plugin: "dwb_core::DWBLocalPlanner"
+
+      # --- Giới hạn vận tốc ---
+      min_vel_x: 0.0        # Vận tốc tiến tối thiểu (m/s) — tăng nếu không muốn robot đứng yên
+      max_vel_x: 0.3        # Vận tốc tiến tối đa (m/s) — giảm nếu robot đi quá nhanh
+      min_vel_y: 0.0        # Differential drive: không có chuyển động ngang
+      max_vel_y: 0.0
+      min_vel_theta: -0.5   # Vận tốc quay tối thiểu (rad/s)
+      max_vel_theta: 0.5    # Vận tốc quay tối đa (rad/s) — giảm nếu robot quay giật cục
+      min_speed_xy: 0.0     # Tốc độ tổng hợp tối thiểu (m/s)
+      max_speed_xy: 0.3     # Tốc độ tổng hợp tối đa (m/s) — nên bằng max_vel_x
+      min_speed_theta: 0.0  # Tốc độ quay tối thiểu (rad/s) — >0 ép robot luôn quay khi cần
+
+      # --- Giới hạn gia tốc ---
+      acc_lim_x: 1.0      # Gia tốc tiến tối đa (m/s²) — giảm nếu robot tăng tốc giật
+      acc_lim_y: 0.0
+      acc_lim_theta: 1.0    # Gia tốc góc tối đa (rad/s²) — giảm nếu robot quay giật
+      decel_lim_x: -1.0     # Gia tốc hãm tiến (m/s²) — tăng tuyệt đối nếu robot phanh chậm
+      decel_lim_theta: -2.0  # Gia tốc hãm góc (rad/s²)
+
+      # --- Lấy mẫu quỹ đạo ---
+      vx_samples: 20        # Số mẫu vận tốc tiến — tăng để tìm quỹ đạo tốt hơn nhưng tốn CPU
+      vy_samples: 1         # Differential drive: để 1
+      vtheta_samples: 20    # Số mẫu vận tốc quay — tăng nếu robot quay không mượt
+
+      # --- Mô phỏng quỹ đạo ---
+      sim_time: 1.5         # Thời gian nhìn trước (s) — tăng để robot lên kế hoạch xa hơn
+      linear_granularity: 0.05   # Bước tịnh tiến khi mô phỏng (m) — giảm để kiểm tra va chạm kỹ hơn
+      angular_granularity: 0.025 # Bước góc khi mô phỏng (rad)
+      transform_tolerance: 0.2
+      xy_goal_tolerance: 0.25    # Dung sai vị trí đến đích (m) — tăng nếu robot không chịu dừng
+      trans_stopped_velocity: 0.25
+
+      # --- Critics: hàm đánh giá từng quỹ đạo ---
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+
+      BaseObstacle:
+        scale: 0.02          # Phạt đi gần vật cản — tăng nếu robot hay cà vào đồ vật
+
+      PathAlign:
+        scale: 32.0          # Bám theo hướng của global path — tăng nếu robot hay cắt đường tắt tùy tiện
+        forward_point_distance: 0.1
+
+      GoalAlign:
+        scale: 24.0          # Hướng đến mục tiêu — tăng nếu robot lệch hướng khi gần đích
+        forward_point_distance: 0.1
+
+      PathDist:
+        scale: 32.0          # Giữ khoảng cách gần global path — tăng nếu robot bị lạc đường
+
+      GoalDist:
+        scale: 24.0          # Tiến đến đích — tăng nếu robot do dự không chịu tiến
+
+      RotateToGoal:
+        scale: 32.0          # Quay về hướng đích khi gần tới nơi — tăng nếu robot đến đích nhưng không xoay đúng
+        slowing_factor: 5.0  # Giảm tốc khi xoay tại đích — tăng để phanh sớm hơn
+        lookahead_time: -1.0 # -1 = dùng sim_time; >0 = chỉ nhìn trước N giây khi xoay
+
+      Oscillation:
+        scale: 1.0                   # Phạt dao động (tiến-lùi liên tục) — tăng nếu robot bị kẹt và rung tại chỗ
+        oscillation_reset_dist: 0.05 # Di chuyển đủ xa này thì reset bộ đếm dao động (m)
+        oscillation_reset_angle: 0.2 # Quay đủ góc này thì reset bộ đếm dao động (rad)
 
 local_costmap:
   local_costmap:
@@ -189,7 +175,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 10.0
-        inflation_radius: 0.35
+        inflation_radius: 0.5
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -300,7 +286,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 0.3
+        inflation_radius: 0.4
         cost_scaling_factor: 10.0
         inflate_unknown: false
         inflate_around_unknown: true

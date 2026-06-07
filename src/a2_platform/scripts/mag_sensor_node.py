@@ -65,7 +65,7 @@ class MagSensorNode(Node):
     def __init__(self):
         super().__init__("mag_sensor_node")
 
-        self.declare_parameter("port",    "/dev/ttyUSB1")
+        self.declare_parameter("port",    "/dev/magnetic")
         self.declare_parameter("baudrate", 115200)
 
         port = self.get_parameter("port").value

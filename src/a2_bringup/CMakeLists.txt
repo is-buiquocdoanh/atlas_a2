@@ -30,6 +30,7 @@ install(DIRECTORY launch models config urdf
 install(PROGRAMS
   scripts/yolov8_ros2_pt.py
   scripts/yolov8_ros2_subscriber.py
+  scripts/line_follow.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
