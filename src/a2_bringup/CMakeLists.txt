@@ -31,7 +31,6 @@ install(PROGRAMS
   scripts/yolov8_ros2_pt.py
   scripts/yolov8_ros2_subscriber.py
   scripts/line_follow.py
-  scripts/line_follow_v2.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

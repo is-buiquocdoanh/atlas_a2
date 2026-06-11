@@ -67,13 +67,17 @@ class BatteryNode(Node):
             # not all platforms / pyserial versions support this; ignore
             pass
 
+        # Voltage thresholds for % calculation
+        self.V_MAX = 27.4   # 100% — fully charged
+        self.V_MIN = 24.3   # 0%  — cutoff / shutdown
+
         # Publisher
-        self.pub = self.create_publisher(BatteryState, '/battery_state', 10)
+        self.pub = self.create_publisher(BatteryState, '/atlas/battery', 10)
 
         # Timer (đọc mỗi 0.5s)
         self.timer = self.create_timer(0.5, self.timer_callback)
 
-        self.get_logger().info("Battery node started")
+        self.get_logger().info("Battery node started — topic: /atlas/battery")
 
     def read_register(self, reg_addr: int):
         tx = build_read_frame(self.slave_id, reg_addr, 1)
@@ -181,26 +185,31 @@ class BatteryNode(Node):
         # if we get here, no successful read
         raise TimeoutError("Không nhận phản hồi sau nhiều lần thử")
 
+    def _voltage_to_pct(self, voltage: float) -> float:
+        """Tính % pin từ điện áp: V_MAX=100%, V_MIN=0%."""
+        pct = (voltage - self.V_MIN) / (self.V_MAX - self.V_MIN) * 100.0
+        return max(0.0, min(100.0, pct))
+
     def timer_callback(self):
         try:
-            percent = self.read_register(0x0000)
             voltage_raw = self.read_register(0x0001)
-
             voltage = voltage_raw / 100.0
+
+            percent = self._voltage_to_pct(voltage)
 
             msg = BatteryState()
             msg.header.stamp = self.get_clock().now().to_msg()
-
-            msg.percentage = percent / 100.0   # ROS dùng 0.0 -> 1.0
-            msg.voltage = voltage
-            msg.present = True
-
-            # Optional
+            msg.voltage    = voltage
+            msg.percentage = percent / 100.0   # ROS dùng 0.0 → 1.0
+            msg.present    = True
             msg.power_supply_status = BatteryState.POWER_SUPPLY_STATUS_DISCHARGING
 
             self.pub.publish(msg)
 
-            self.get_logger().info(f"Pin: {percent}%, Voltage: {voltage:.1f}V")
+            self.get_logger().info(
+                f"Pin: {percent:.1f}%  ({voltage:.2f}V  |  "
+                f"{self.V_MIN}V=0%  {self.V_MAX}V=100%)"
+            )
 
         except TimeoutError as e:
             # transient / no device response — log at debug to avoid spam

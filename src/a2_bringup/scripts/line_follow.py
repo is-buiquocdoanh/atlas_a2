@@ -18,16 +18,17 @@ from geometry_msgs.msg import Twist
 
 # ── Thông số (ghi đè qua ROS parameter) ──────────────────────────────────────
 LINEAR_X      = -0.05
-KP            = 0.007
-KD            = 0.05
-LPF_ALPHA     = 0.30
+KP            = 0.005
+KD            = 0.04
+LPF_ALPHA     = 0.50
 SENSOR_GATE   = 10
 THRESHOLD_SUM = 60
-MAX_ANG       = 0.30
+MAX_ANG       = 0.50
 LOST_TIMEOUT  = 0.3
 CONTROL_RATE  = 20.0
 SPEED_REDUCE  = 0.70
 NO_LINE_STOP  = 0.5    # mất vạch khi đang FOLLOW → dừng hẳn (s)
+STOP_HOLD_T   = 5.0    # sau khi STOPPED: publish zero bao lâu rồi im lặng → nav2 hoạt động lại
 
 # ── Search params ─────────────────────────────────────────────────────────────
 INIT_WAIT       = 0.5   # chờ sensor ổn định khi mới khởi động (s)
@@ -73,6 +74,7 @@ class LineFollower(Node):
         self.declare_parameter("control_rate",  CONTROL_RATE)
         self.declare_parameter("speed_reduce",  SPEED_REDUCE)
         self.declare_parameter("no_line_stop",  NO_LINE_STOP)
+        self.declare_parameter("stop_hold_t",   STOP_HOLD_T)
 
         self.linear_x      = self.get_parameter("linear_x").value
         self.kp            = self.get_parameter("kp").value
@@ -85,6 +87,7 @@ class LineFollower(Node):
         self.control_rate  = self.get_parameter("control_rate").value
         self.speed_reduce  = self.get_parameter("speed_reduce").value
         self.no_line_stop  = self.get_parameter("no_line_stop").value
+        self.stop_hold_t   = self.get_parameter("stop_hold_t").value
 
         self._sub     = self.create_subscription(
             UInt16MultiArray, "/sensor/analog16", self._cb_sensor, 10)
@@ -103,8 +106,9 @@ class LineFollower(Node):
         self._search_step   = 0
         self._search_step_t = 0.0
         self._no_line_since = None
+        self._stopped_at    = None   # thời điểm vào STOPPED
 
-        self.create_timer(1.0 / self.control_rate, self._control_loop)
+        self._ctrl_timer = self.create_timer(1.0 / self.control_rate, self._control_loop)
         self.get_logger().info(
             f"line_follow: kp={self.kp}, kd={self.kd}, "
             f"sensor_gate={self.sensor_gate}, threshold_sum={self.threshold_sum}"
@@ -138,7 +142,15 @@ class LineFollower(Node):
 
         # ── STOPPED ───────────────────────────────────────────────────────────
         if self._state == _STOPPED:
-            self._cmd_pub.publish(cmd)
+            if self._stopped_at is None:
+                self._stopped_at = now
+            if now - self._stopped_at < self.stop_hold_t:
+                # giữ zero để robot đứng yên (sạc ổn định)
+                self._cmd_pub.publish(cmd)
+            else:
+                # im lặng hoàn toàn → twist_mux timeout → nav2 hoạt động lại
+                self._ctrl_timer.cancel()
+                self.get_logger().info("line_follow: released — nav2 active")
             return
 
         # ── INIT ──────────────────────────────────────────────────────────────
@@ -156,33 +168,35 @@ class LineFollower(Node):
         # ── SEARCH ────────────────────────────────────────────────────────────
         if self._state == _SEARCH:
             if error is not None:
-                self._state = _FOLLOW
+                # Thấy vạch → chuyển FOLLOW ngay, không return
+                # để FOLLOW block bên dưới chạy cùng cycle → PD bắt đầu tức thì
+                self._state         = _FOLLOW
                 self._no_line_since = None
                 self._filtered_err  = error
                 self._prev_err      = error
                 self._prev_err_time = now
                 self.get_logger().info(f"tìm thấy vạch ở bước {self._search_step} — FOLLOW")
+                # fall-through xuống FOLLOW block
+            else:
+                if self._search_step >= len(_SEARCH_STEPS):
+                    self._state      = _STOPPED
+                    self._stopped_at = now
+                    self.get_logger().warn("không tìm thấy vạch — dừng hẳn")
+                    self._cmd_pub.publish(cmd)
+                    return
+
+                duration, use_linear, ang_sign = _SEARCH_STEPS[self._search_step]
+
+                if now - self._search_step_t >= duration:
+                    self._search_step  += 1
+                    self._search_step_t = now
+                    self._cmd_pub.publish(cmd)
+                    return
+
+                cmd.linear.x  = float(self.linear_x) if use_linear else 0.0
+                cmd.angular.z = ang_sign * SEARCH_ANG
                 self._cmd_pub.publish(cmd)
                 return
-
-            if self._search_step >= len(_SEARCH_STEPS):
-                self._state = _STOPPED
-                self.get_logger().warn("không tìm thấy vạch — dừng hẳn")
-                self._cmd_pub.publish(cmd)
-                return
-
-            duration, use_linear, ang_sign = _SEARCH_STEPS[self._search_step]
-
-            if now - self._search_step_t >= duration:
-                self._search_step  += 1
-                self._search_step_t = now
-                self._cmd_pub.publish(cmd)
-                return
-
-            cmd.linear.x  = float(self.linear_x) if use_linear else 0.0
-            cmd.angular.z = ang_sign * SEARCH_ANG
-            self._cmd_pub.publish(cmd)
-            return
 
         # ── FOLLOW ────────────────────────────────────────────────────────────
         if self._state == _FOLLOW:
@@ -190,7 +204,8 @@ class LineFollower(Node):
                 if self._no_line_since is None:
                     self._no_line_since = now
                 elif now - self._no_line_since >= self.no_line_stop:
-                    self._state = _STOPPED
+                    self._state      = _STOPPED
+                    self._stopped_at = now
                     self.get_logger().info("mất vạch — dừng hẳn")
                 self._filtered_err = 0.0
                 self._prev_err     = 0.0
