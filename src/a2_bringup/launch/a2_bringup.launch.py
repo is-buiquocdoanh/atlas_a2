@@ -79,7 +79,7 @@ def generate_launch_description():
         executable='web_video_server',
         name='web_video_server',
         parameters=[{
-            'port': 8080,          # Cổng để truy cập trên trình duyệt
+            'port': 6060,          # Cổng để truy cập trên trình duyệt
             'address': '0.0.0.0',  # Cho phép tất cả các IP trong mạng truy cập
             'type': 'ros_compressed' # Ưu tiên dùng chuẩn nén để mượt hơn
         }],

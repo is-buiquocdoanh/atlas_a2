@@ -17,22 +17,45 @@ from std_msgs.msg import UInt16MultiArray, Float32
 from geometry_msgs.msg import Twist
 
 # ── Thông số (ghi đè qua ROS parameter) ──────────────────────────────────────
-LINEAR_X          = -0.15   # Tốc độ tiến (m/s) — giảm nếu robot lệch nhiều
-KP                = 0.35   # Hệ số P — tăng nếu bám không sát, giảm nếu dao động
-KD                = 0.08   # Hệ số D — tăng nếu còn vọt lố, giảm nếu phản ứng trễ
-LPF_ALPHA         = 0.4    # Low-pass: gần 0=lọc mạnh (chậm), gần 1=ít lọc (nhanh)
-SENSOR_GATE       = 10     # Ngưỡng từng kênh: bỏ qua sensor < giá trị này (lọc nhiễu nền)
-THRESHOLD_SUM     = 80     # Tổng tín hiệu tối thiểu để nhận ra có vạch — QUAN TRỌNG
-                           #   trên vạch ≈ 400-500, ngoài vạch ≈ 40 → đặt ~80
-MAX_ANG           = 1.2    # Vận tốc góc tối đa (rad/s)
-LOST_TIMEOUT      = 0.3    # Mất vạch quá lâu này (s) → dừng hẳn
-CONTROL_RATE      = 20.0   # Tần số điều khiển (Hz)
-SPEED_REDUCE      = 0.5    # Giảm tốc tiến theo độ lệch: 0=không giảm, 1=dừng khi lệch max
+LINEAR_X      = -0.05
+KP            = 0.007
+KD            = 0.05
+LPF_ALPHA     = 0.30
+SENSOR_GATE   = 10
+THRESHOLD_SUM = 60
+MAX_ANG       = 0.30
+LOST_TIMEOUT  = 0.3
+CONTROL_RATE  = 20.0
+SPEED_REDUCE  = 0.70
+NO_LINE_STOP  = 0.5    # mất vạch khi đang FOLLOW → dừng hẳn (s)
+
+# ── Search params ─────────────────────────────────────────────────────────────
+INIT_WAIT       = 0.5   # chờ sensor ổn định khi mới khởi động (s)
+SEARCH_BACK_T   = 2.0   # bước 0: lùi ~10cm (LINEAR_X=-0.05 × 2.0s = 10cm)
+SEARCH_ANG      = 0.13  # tốc độ quay khi tìm vạch (rad/s)
+SEARCH_LEFT_T   = 4.0   # bước 1: xoay TRÁI ~30°
+SEARCH_RIGHT_T  = 4.0   # bước 2: xoay PHẢI ~30° (qua tâm)
+SEARCH_RETURN_T = 2.0   # bước 3: về GIỮA
+
+# (linear, angular_sign) cho từng bước search
+# linear=1 → dùng self.linear_x; linear=0 → đứng yên chỉ xoay
+_SEARCH_STEPS = [
+    (SEARCH_BACK_T,   1,    0.0),   # bước 0: lùi thẳng
+    (SEARCH_LEFT_T,   0,   +1.0),   # bước 1: xoay trái
+    (SEARCH_RIGHT_T,  0,   -1.0),   # bước 2: xoay phải
+    (SEARCH_RETURN_T, 0,   +1.0),   # bước 3: về giữa
+]
 
 # Vị trí logic của 16 kênh (trái âm, phải dương, đơn vị tùy ý)
 _POSITIONS = [-7.5, -6.5, -5.5, -4.5, -3.5, -2.5, -1.5, -0.5,
                0.5,  1.5,  2.5,  3.5,  4.5,  5.5,  6.5,  7.5]
 _MAX_POS = 7.5
+
+# States
+_INIT    = 0
+_SEARCH  = 1
+_FOLLOW  = 2
+_STOPPED = 3
 
 
 class LineFollower(Node):
@@ -49,6 +72,7 @@ class LineFollower(Node):
         self.declare_parameter("lost_timeout",  LOST_TIMEOUT)
         self.declare_parameter("control_rate",  CONTROL_RATE)
         self.declare_parameter("speed_reduce",  SPEED_REDUCE)
+        self.declare_parameter("no_line_stop",  NO_LINE_STOP)
 
         self.linear_x      = self.get_parameter("linear_x").value
         self.kp            = self.get_parameter("kp").value
@@ -60,8 +84,9 @@ class LineFollower(Node):
         self.lost_timeout  = self.get_parameter("lost_timeout").value
         self.control_rate  = self.get_parameter("control_rate").value
         self.speed_reduce  = self.get_parameter("speed_reduce").value
+        self.no_line_stop  = self.get_parameter("no_line_stop").value
 
-        self._sub = self.create_subscription(
+        self._sub     = self.create_subscription(
             UInt16MultiArray, "/sensor/analog16", self._cb_sensor, 10)
         self._cmd_pub = self.create_publisher(Twist, "/cmd_vel_mag", 10)
         self._err_pub = self.create_publisher(Float32, "/line_error", 10)
@@ -73,10 +98,16 @@ class LineFollower(Node):
         self._prev_err      = 0.0
         self._prev_err_time = time.monotonic()
 
+        self._state         = _INIT
+        self._state_t       = time.monotonic()
+        self._search_step   = 0
+        self._search_step_t = 0.0
+        self._no_line_since = None
+
         self.create_timer(1.0 / self.control_rate, self._control_loop)
         self.get_logger().info(
-            f"line_follow: sensor_gate={self.sensor_gate}, "
-            f"threshold_sum={self.threshold_sum}, kp={self.kp}, kd={self.kd}"
+            f"line_follow: kp={self.kp}, kd={self.kd}, "
+            f"sensor_gate={self.sensor_gate}, threshold_sum={self.threshold_sum}"
         )
 
     def _cb_sensor(self, msg: UInt16MultiArray):
@@ -84,66 +115,110 @@ class LineFollower(Node):
         self._last_t = time.monotonic()
 
     def _compute_error(self):
-        """
-        Weighted centroid của 16 kênh sau khi lọc nhiễu nền.
-        Trả về (error, sum_filtered) hoặc None nếu không thấy vạch.
-        """
-        data = self._raw
-        if data is None or len(data) != 16:
+        now = time.monotonic()
+        if self._raw is None or (now - self._last_t) > self.lost_timeout:
             return None
-
-        # Lọc nhiễu nền: sensor dưới gate coi là 0
-        gated = [v if v >= self.sensor_gate else 0 for v in data]
-
+        gated = [max(0.0, float(v) - self.sensor_gate) for v in self._raw]
         total = sum(gated)
         if total < self.threshold_sum:
-            return None  # không đủ tín hiệu → không có vạch
+            return None
+        return sum(p * v for p, v in zip(_POSITIONS, gated)) / total
 
-        error = sum(p * v for p, v in zip(_POSITIONS, gated)) / total
-        return error
+    def _enter_search(self, now):
+        self._state         = _SEARCH
+        self._state_t       = now
+        self._search_step   = 0
+        self._search_step_t = now
+        self.get_logger().info("vạch không thấy — bắt đầu quét tìm")
 
     def _control_loop(self):
-        now = time.monotonic()
-        cmd = Twist()
-
-        # Dừng nếu chưa nhận được dữ liệu hoặc mất vạch quá lâu
-        if self._raw is None or (now - self._last_t) > self.lost_timeout:
-            self._cmd_pub.publish(cmd)
-            return
-
+        now   = time.monotonic()
+        cmd   = Twist()
         error = self._compute_error()
-        if error is None:
-            # Không thấy vạch → dừng hẳn, reset bộ lọc
-            self._filtered_err = 0.0
-            self._prev_err = 0.0
+
+        # ── STOPPED ───────────────────────────────────────────────────────────
+        if self._state == _STOPPED:
             self._cmd_pub.publish(cmd)
             return
 
-        # 1. Low-pass filter
-        a = self.lpf_alpha
-        self._filtered_err = a * error + (1.0 - a) * self._filtered_err
+        # ── INIT ──────────────────────────────────────────────────────────────
+        if self._state == _INIT:
+            if now - self._state_t < INIT_WAIT:
+                self._cmd_pub.publish(cmd)
+                return
+            if error is not None:
+                self._state = _FOLLOW
+                self.get_logger().info("bắt vạch ngay — FOLLOW")
+            else:
+                self._enter_search(now)
+            return
 
-        # 2. D term
-        dt = now - self._prev_err_time
-        d_err = (self._filtered_err - self._prev_err) / dt if dt > 0.001 else 0.0
-        self._prev_err      = self._filtered_err
-        self._prev_err_time = now
+        # ── SEARCH ────────────────────────────────────────────────────────────
+        if self._state == _SEARCH:
+            if error is not None:
+                self._state = _FOLLOW
+                self._no_line_since = None
+                self._filtered_err  = error
+                self._prev_err      = error
+                self._prev_err_time = now
+                self.get_logger().info(f"tìm thấy vạch ở bước {self._search_step} — FOLLOW")
+                self._cmd_pub.publish(cmd)
+                return
 
-        # 3. PD → vận tốc góc (dấu âm vì error dương = lệch phải → quay trái)
-        angular = -(self.kp * self._filtered_err + self.kd * d_err)
-        angular = max(-self.max_ang, min(self.max_ang, angular))
+            if self._search_step >= len(_SEARCH_STEPS):
+                self._state = _STOPPED
+                self.get_logger().warn("không tìm thấy vạch — dừng hẳn")
+                self._cmd_pub.publish(cmd)
+                return
 
-        # 4. Giảm tốc tiến tỉ lệ độ lệch
-        err_norm = min(abs(self._filtered_err) / _MAX_POS, 1.0)
-        linear   = self.linear_x * (1.0 - self.speed_reduce * err_norm)
+            duration, use_linear, ang_sign = _SEARCH_STEPS[self._search_step]
 
-        cmd.linear.x  = float(linear)
-        cmd.angular.z = float(angular)
-        self._cmd_pub.publish(cmd)
+            if now - self._search_step_t >= duration:
+                self._search_step  += 1
+                self._search_step_t = now
+                self._cmd_pub.publish(cmd)
+                return
 
-        msg = Float32()
-        msg.data = float(self._filtered_err)
-        self._err_pub.publish(msg)
+            cmd.linear.x  = float(self.linear_x) if use_linear else 0.0
+            cmd.angular.z = ang_sign * SEARCH_ANG
+            self._cmd_pub.publish(cmd)
+            return
+
+        # ── FOLLOW ────────────────────────────────────────────────────────────
+        if self._state == _FOLLOW:
+            if error is None:
+                if self._no_line_since is None:
+                    self._no_line_since = now
+                elif now - self._no_line_since >= self.no_line_stop:
+                    self._state = _STOPPED
+                    self.get_logger().info("mất vạch — dừng hẳn")
+                self._filtered_err = 0.0
+                self._prev_err     = 0.0
+                self._cmd_pub.publish(cmd)
+                return
+
+            self._no_line_since = None
+
+            a = self.lpf_alpha
+            self._filtered_err = a * error + (1.0 - a) * self._filtered_err
+
+            dt    = now - self._prev_err_time
+            d_err = (self._filtered_err - self._prev_err) / dt if dt > 0.001 else 0.0
+            self._prev_err      = self._filtered_err
+            self._prev_err_time = now
+
+            angular  = -(self.kp * self._filtered_err + self.kd * d_err)
+            angular  = max(-self.max_ang, min(self.max_ang, angular))
+            err_norm = min(abs(self._filtered_err) / _MAX_POS, 1.0)
+            linear   = self.linear_x * (1.0 - self.speed_reduce * err_norm)
+
+            cmd.linear.x  = float(linear)
+            cmd.angular.z = float(angular)
+            self._cmd_pub.publish(cmd)
+
+            msg      = Float32()
+            msg.data = float(self._filtered_err)
+            self._err_pub.publish(msg)
 
 
 def main(args=None):
