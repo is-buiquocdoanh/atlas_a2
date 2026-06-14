@@ -57,9 +57,9 @@ def generate_launch_description():
         name='usb_camera',
         parameters=[
             {"video_device": "/dev/video2"},
-            {"image_size": [352, 288]},
+            {"image_size": [640, 480]},
             {"pixel_format": "YUYV"},
-            {"frame_rate": 30},
+            {"frame_rate": 15},
         ]
     )
 
@@ -86,6 +86,13 @@ def generate_launch_description():
         output='screen'
     )
     
+    yolov8 = Node(
+        package='a2_bringup',
+        executable='yolov8_ros2_pt.py',
+        name='yolov8_node',
+        output='screen',
+    )
+    
     joy_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('a2_bringup'), 'launch', 'joystick.launch.py')
@@ -100,7 +107,14 @@ def generate_launch_description():
         output='screen',
         parameters=[{"port": "/dev/usbcan"}]
     )
-
+    
+    # API
+    api_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('atlas_api'), 'launch', 'atlas_api_real.launch.py')
+        )
+    )
+    
     return LaunchDescription([
         platform_launch,
         robot_state_publisher,
@@ -109,6 +123,8 @@ def generate_launch_description():
         camera_node,
         republish_node,
         web_video_server_node,
+        yolov8,
         joy_launch,
         driver_node,
+        api_launch,
     ])

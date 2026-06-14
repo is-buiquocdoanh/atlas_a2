@@ -39,7 +39,7 @@ class Camera_subscriber(Node):
         results = self.model(img)
 
         self.yolov8_inference.header.frame_id = "inference"
-        self.yolov8_inference.header.stamp = camera_subscriber.get_clock().now().to_msg()
+        self.yolov8_inference.header.stamp = self.get_clock().now().to_msg()
 
         for r in results:
             boxes = r.boxes
@@ -55,7 +55,7 @@ class Camera_subscriber(Node):
                 self.yolov8_inference.yolov8_inference.append(self.inference_result)
 
         annotated_frame = results[0].plot()
-        img_msg = bridge.cv2_to_imgmsg(annotated_frame)
+        img_msg = bridge.cv2_to_imgmsg(annotated_frame, encoding="bgr8")
 
         self.img_pub.publish(img_msg)
         self.yolov8_pub.publish(self.yolov8_inference)

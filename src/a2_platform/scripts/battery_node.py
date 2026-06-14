@@ -69,7 +69,7 @@ class BatteryNode(Node):
 
         # Voltage thresholds for % calculation
         self.V_MAX = 27.4   # 100% — fully charged
-        self.V_MIN = 24.3   # 0%  — cutoff / shutdown
+        self.V_MIN = 25.0   # 0%  — cutoff / shutdown
 
         # Publisher
         self.pub = self.create_publisher(BatteryState, '/atlas/battery', 10)
