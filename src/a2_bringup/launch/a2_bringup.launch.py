@@ -56,7 +56,7 @@ def generate_launch_description():
         executable='v4l2_camera_node',
         name='usb_camera',
         parameters=[
-            {"video_device": "/dev/video2"},
+            {"video_device": "/dev/video0"},
             {"image_size": [640, 480]},
             {"pixel_format": "YUYV"},
             {"frame_rate": 15},
