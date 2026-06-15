@@ -1,0 +1,29 @@
+services:
+  atlas_app:
+    build:
+      context: ..
+      dockerfile: Dockder/Dockerfile.app
+    image: atlas_a2:app
+    container_name: atlas_app
+    restart: unless-stopped
+
+    network_mode: host               # để ROS2 DDS thấy các topic từ robot
+
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+      - ROBOT_HOST=${ROBOT_HOST}
+      - QT_X11_NO_MITSHM=1
+
+    volumes:
+      # X11 socket để hiển thị GUI
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Config app (settings, positions đã lưu)
+      - atlas_app_config:/root/.config/atlas_app
+
+    env_file:
+      - .env
+
+volumes:
+  atlas_app_config:
+    driver: local

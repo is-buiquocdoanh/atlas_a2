@@ -1,0 +1,40 @@
+services:
+  atlas_robot:
+    build:
+      context: ..                    # workspace root
+      dockerfile: Dockder/Dockerfile.robot
+    image: atlas_a2:robot
+    container_name: atlas_robot
+    restart: unless-stopped
+
+    # Dùng network host để ROS2 DDS giao tiếp được với các node khác
+    network_mode: host
+    pid: host                        # cho phép đọc PID host (slam_toolbox cần)
+
+    # Truy cập toàn bộ thiết bị phần cứng
+    privileged: true
+    devices:
+      - "${DEV_USBCAN}:${DEV_USBCAN}"
+      - "${DEV_RPLIDAR}:${DEV_RPLIDAR}"
+      - "${DEV_CAMERA}:${DEV_CAMERA}"
+      - "${DEV_BATTERY}:${DEV_BATTERY}"
+      - "${DEV_ESP32}:${DEV_ESP32}"
+      - "${DEV_MAGNETIC}:${DEV_MAGNETIC}"
+
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+
+    volumes:
+      # Lưu map persistent ra ngoài container
+      - atlas_maps:/workspace/src/atlas_base/atlas_maps
+      # Config atlas_api (waypoints, walls, settings) persist
+      - atlas_config:/root/.config/atlas_app
+
+    env_file:
+      - .env
+
+volumes:
+  atlas_maps:
+    driver: local
+  atlas_config:
+    driver: local

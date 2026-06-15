@@ -18,12 +18,12 @@ from geometry_msgs.msg import Twist
 
 # ── Thông số (ghi đè qua ROS parameter) ──────────────────────────────────────
 LINEAR_X      = -0.05
-KP            = 0.005
+KP            = 0.02 # tăng KP để bám vạch chặt hơn, nhưng phải giảm KD để tránh vọt lố do phản ứng quá mạnh với error đột ngột (nhất là khi mới bắt vạch hoặc sắp mất vạch)
 KD            = 0.04
 LPF_ALPHA     = 0.50
 SENSOR_GATE   = 10
 THRESHOLD_SUM = 60
-MAX_ANG       = 0.50
+MAX_ANG       = 0.60
 LOST_TIMEOUT  = 0.3
 CONTROL_RATE  = 20.0
 SPEED_REDUCE  = 0.70
@@ -32,19 +32,29 @@ STOP_HOLD_T   = 5.0    # sau khi STOPPED: publish zero bao lâu rồi im lặng 
 
 # ── Search params ─────────────────────────────────────────────────────────────
 INIT_WAIT       = 0.5   # chờ sensor ổn định khi mới khởi động (s)
-SEARCH_BACK_T   = 2.0   # bước 0: lùi ~10cm (LINEAR_X=-0.05 × 2.0s = 10cm)
+SEARCH_BACK_T   = 4.0   # bước 0: lùi ~10cm (LINEAR_X=-0.05 × 2.0s = 10cm)
 SEARCH_ANG      = 0.13  # tốc độ quay khi tìm vạch (rad/s)
-SEARCH_LEFT_T   = 4.0   # bước 1: xoay TRÁI ~30°
-SEARCH_RIGHT_T  = 4.0   # bước 2: xoay PHẢI ~30° (qua tâm)
-SEARCH_RETURN_T = 2.0   # bước 3: về GIỮA
+# Lượt 1: quét ±30°
+SEARCH_LEFT_T   = 4.0   # bước 1: xoay TRÁI  4s → −30°
+SEARCH_RIGHT_T  = 8.0   # bước 2: xoay PHẢI  8s → −30°→0°→+30° (qua tâm)
+SEARCH_RETURN_T = 4.0   # bước 3: về GIỮA    4s → +30°→0°
+# Lượt 2: quét ±45° (rộng hơn)
+SEARCH_BACK2_T  = 2.0   # bước 4: lùi thêm
+SEARCH_LEFT2_T  = 6.0   # bước 5: xoay TRÁI  6s → −45°
+SEARCH_RIGHT2_T = 12.0  # bước 6: xoay PHẢI 12s → −45°→0°→+45° (qua tâm)
+SEARCH_RETURN2T = 6.0   # bước 7: về GIỮA    6s → +45°→0°
 
-# (linear, angular_sign) cho từng bước search
+# (duration, use_linear, angular_sign) cho từng bước search
 # linear=1 → dùng self.linear_x; linear=0 → đứng yên chỉ xoay
 _SEARCH_STEPS = [
     (SEARCH_BACK_T,   1,    0.0),   # bước 0: lùi thẳng
-    (SEARCH_LEFT_T,   0,   +1.0),   # bước 1: xoay trái
-    (SEARCH_RIGHT_T,  0,   -1.0),   # bước 2: xoay phải
-    (SEARCH_RETURN_T, 0,   +1.0),   # bước 3: về giữa
+    (SEARCH_LEFT_T,   0,   +1.0),   # bước 1: trái  4s → −30°
+    (SEARCH_RIGHT_T,  0,   -1.0),   # bước 2: phải  8s → −30°→+30°
+    (SEARCH_RETURN_T, 0,   +1.0),   # bước 3: giữa  4s → +30°→0°
+    (SEARCH_BACK2_T,  1,    0.0),   # bước 4: lùi thêm
+    (SEARCH_LEFT2_T,  0,   +1.0),   # bước 5: trái  6s → −45°
+    (SEARCH_RIGHT2_T, 0,   -1.0),   # bước 6: phải 12s → −45°→+45°
+    (SEARCH_RETURN2T, 0,   +1.0),   # bước 7: giữa  6s → +45°→0°
 ]
 
 # Vị trí logic của 16 kênh (trái âm, phải dương, đơn vị tùy ý)
@@ -181,7 +191,7 @@ class LineFollower(Node):
                 if self._search_step >= len(_SEARCH_STEPS):
                     self._state      = _STOPPED
                     self._stopped_at = now
-                    self.get_logger().warn("không tìm thấy vạch — dừng hẳn")
+                    self.get_logger().warn("không tìm thấy vạch sau 2 lượt quét — dừng hẳn")
                     self._cmd_pub.publish(cmd)
                     return
 

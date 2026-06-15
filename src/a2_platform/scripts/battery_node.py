@@ -68,7 +68,7 @@ class BatteryNode(Node):
             pass
 
         # Voltage thresholds for % calculation
-        self.V_MAX = 27.4   # 100% — fully charged
+        self.V_MAX = 26.8   # 100% — fully charged
         self.V_MIN = 25.0   # 0%  — cutoff / shutdown
 
         # Publisher

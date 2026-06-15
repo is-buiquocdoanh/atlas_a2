@@ -1,0 +1,20 @@
+# Udev rules cho Atlas A2 — copy vào /etc/udev/rules.d/ trên robot
+# Sau đó: sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# Cách tìm idVendor/idProduct: lsusb hoặc udevadm info -a /dev/ttyUSBx
+# Thay idVendor, idProduct, ATTRS{serial} đúng với thiết bị thực tế.
+
+# USB-CAN adapter (TSDA-C12D)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="usbcan", MODE="0666"
+
+# RPLidar A2M12
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="rplidar", SYMLINK+="rplidar", MODE="0666"
+
+# Battery BMS
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="battery", SYMLINK+="battery", MODE="0666"
+
+# ESP32 (collision detect)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="esp32", SYMLINK+="esp32", MODE="0666"
+
+# Magnetic line sensor
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="magnetic", MODE="0666"
