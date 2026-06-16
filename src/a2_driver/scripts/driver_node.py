@@ -11,18 +11,14 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import Int32MultiArray
 
 from motor_control import (
     LEFT_ID, RIGHT_ID, PORT, SERIAL_BAUD, GEAR_RATIO,
     set_gear_ratio, set_inversion, set_inversions,
     apply_inversion, twist_to_rpm,
-    initialize_driver, run_speed_rpm, stop_motor, read_encoder,
+    initialize_driver, run_speed_rpm, stop_motor,
 )
 from usb_can_a import USBCanA
-
-_ENCODER_READ_TIMEOUT = 0.02   # 20ms per encoder read — hardware typically responds in 1-5ms
-_ENCODER_HZ = 30.0             # encoder IO thread target rate
 
 
 class TsdaDriver(Node):
@@ -73,53 +69,10 @@ class TsdaDriver(Node):
         self.control_active = False
         self._vel_deadzone = 1e-4
 
-        # Lock protecting self.dev — shared between motor timer and encoder IO thread
+        # Lock protecting self.dev — shared between motor timer and shutdown sequence
         self._serial_lock = threading.Lock()
 
-        # Encoder publisher
-        self._encoder_pub = self.create_publisher(Int32MultiArray, "/encoder/raw", 10)
-
-        # Encoder IO thread: reads encoders independently, publishes /encoder/raw
-        self._running = True
-        self._enc_thread = threading.Thread(
-            target=self._encoder_loop, daemon=True, name="encoder_io"
-        )
-        self._enc_thread.start()
-
-        self.timer = self.create_timer(0.01, self.update)  # 100 Hz motor control
-
-    # ------------------------------------------------------------------ #
-    #  Encoder IO thread                                                   #
-    # ------------------------------------------------------------------ #
-
-    def _encoder_loop(self) -> None:
-        """Reads both encoders at _ENCODER_HZ and publishes /encoder/raw.
-
-        Uses a lock shared with the motor-command timer so the two never
-        access the serial port simultaneously. Before each read the RX
-        buffer is flushed to discard stale motor-command responses.
-        """
-        period = 1.0 / _ENCODER_HZ
-        while self._running:
-            t0 = time.monotonic()
-
-            with self._serial_lock:
-                try:
-                    self.dev.ser.reset_input_buffer()
-                except Exception:
-                    pass
-                left  = read_encoder(self.dev, LEFT_ID,  response_timeout=_ENCODER_READ_TIMEOUT)
-                right = read_encoder(self.dev, RIGHT_ID, response_timeout=_ENCODER_READ_TIMEOUT)
-
-            if left is not None and right is not None:
-                msg = Int32MultiArray()
-                msg.data = [left, right]
-                self._encoder_pub.publish(msg)
-
-            elapsed = time.monotonic() - t0
-            sleep_t = period - elapsed
-            if sleep_t > 0:
-                time.sleep(sleep_t)
+        self.timer = self.create_timer(0.02, self.update)  # 50 Hz motor control
 
     # ------------------------------------------------------------------ #
     #  ROS2 callbacks                                                      #
@@ -167,9 +120,6 @@ def main(args=None):
     try:
         rclpy.spin(node)
     finally:
-        node._running = False
-        node._enc_thread.join(timeout=1.0)
-
         try:
             with node._serial_lock:
                 for _ in range(4):

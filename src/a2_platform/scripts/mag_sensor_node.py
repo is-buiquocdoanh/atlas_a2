@@ -15,7 +15,7 @@ REG_QTY     = 8      # 8 registers = 16 bytes of data
 
 SER_TIMEOUT = 0.05
 DE_RE_DELAY = 0.005
-IO_HZ       = 50.0
+IO_HZ       = 30.0 # target read/publish rate; actual may be lower due to serial overhead
 
 
 def _crc16_modbus(data: bytes) -> bytes:
