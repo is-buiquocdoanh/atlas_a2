@@ -74,8 +74,8 @@ class BatteryNode(Node):
         # Publisher
         self.pub = self.create_publisher(BatteryState, '/atlas/battery', 10)
 
-        # Timer (đọc mỗi 5s)
-        self.timer = self.create_timer(5.0, self.timer_callback)
+        # Timer (đọc mỗi 20s)
+        self.timer = self.create_timer(20.0, self.timer_callback)
 
         self.get_logger().info("Battery node started — topic: /atlas/battery")
 
