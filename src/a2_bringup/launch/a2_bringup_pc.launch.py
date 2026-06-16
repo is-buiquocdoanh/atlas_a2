@@ -126,5 +126,5 @@ def generate_launch_description():
         # yolov8,
         joy_launch,
         # driver_node,
-        # api_launch,
+        api_launch,
     ])
