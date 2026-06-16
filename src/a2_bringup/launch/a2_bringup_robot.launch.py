@@ -117,12 +117,12 @@ def generate_launch_description():
     
     return LaunchDescription([
         platform_launch,
-        # robot_state_publisher,
+        robot_state_publisher,
         scan_relay,
-        # rf2o_node,
-        # camera_node,
+        rf2o_node,
+        camera_node,
         # republish_node,
-        # web_video_server_node,
+        web_video_server_node,
         # yolov8,
         joy_launch,
         driver_node,
