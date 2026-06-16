@@ -123,7 +123,7 @@ def generate_launch_description():
         camera_node,
         republish_node,
         web_video_server_node,
-        yolov8,
+        # yolov8, # tạm thời chưa chạy yolov8 để tránh lỗi khi thiếu model, sẽ chạy riêng sau khi đã có model
         joy_launch,
         driver_node,
         api_launch,
