@@ -43,7 +43,7 @@ User=$USER_NAME
 Group=$USER_NAME
 Environment="HOME=$USER_HOME"
 Environment="ROS_DOMAIN_ID=04"
-ExecStartPre=/bin/sleep 30
+ExecStartPre=/bin/sleep 15
 ExecStart=$WORKSPACE/setup/start_bringup.sh
 Restart=on-failure
 RestartSec=5
