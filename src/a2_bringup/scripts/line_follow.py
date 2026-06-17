@@ -8,8 +8,13 @@ Thuật toán bám vạch mượt:
   3. Low-pass filter — làm mượt error, tránh giật do nhiễu tức thời
   4. PD control      — P bám vạch, D chống vọt lố
   5. Speed reduction — giảm tốc tiến tỉ lệ độ lệch, robot đủ thời gian quay
+
+Exit codes:
+  0 — docked thành công (tìm thấy vạch → đi hết vạch → đang sạc)
+  1 — thất bại (không tìm thấy vạch sau tất cả các bước quét)
 """
 
+import sys
 import time
 import rclpy
 from rclpy.node import Node
@@ -117,6 +122,9 @@ class LineFollower(Node):
         self._search_step_t = 0.0
         self._no_line_since = None
         self._stopped_at    = None   # thời điểm vào STOPPED
+        self._dock_success  = False  # True = vào STOPPED từ FOLLOW (đi hết vạch = docked)
+        self._done          = False  # True = yêu cầu thoát vòng spin
+        self._exit_code     = 1     # 0=docked OK, 1=thất bại
 
         self._ctrl_timer = self.create_timer(1.0 / self.control_rate, self._control_loop)
         self.get_logger().info(
@@ -158,9 +166,13 @@ class LineFollower(Node):
                 # giữ zero để robot đứng yên (sạc ổn định)
                 self._cmd_pub.publish(cmd)
             else:
-                # im lặng hoàn toàn → twist_mux timeout → nav2 hoạt động lại
                 self._ctrl_timer.cancel()
-                self.get_logger().info("line_follow: released — nav2 active")
+                self._exit_code = 0 if self._dock_success else 1
+                self._done = True
+                if self._dock_success:
+                    self.get_logger().info("line_follow: docked OK — thoát (exit 0)")
+                else:
+                    self.get_logger().warn("line_follow: không tìm thấy vạch — thoát (exit 1)")
             return
 
         # ── INIT ──────────────────────────────────────────────────────────────
@@ -214,9 +226,10 @@ class LineFollower(Node):
                 if self._no_line_since is None:
                     self._no_line_since = now
                 elif now - self._no_line_since >= self.no_line_stop:
-                    self._state      = _STOPPED
-                    self._stopped_at = now
-                    self.get_logger().info("mất vạch — dừng hẳn")
+                    self._state        = _STOPPED
+                    self._stopped_at   = now
+                    self._dock_success = True  # đi hết vạch từ = đang ở trạm sạc
+                    self.get_logger().info("mất vạch — dừng hẳn (docked)")
                 self._filtered_err = 0.0
                 self._prev_err     = 0.0
                 self._cmd_pub.publish(cmd)
@@ -250,12 +263,15 @@ def main(args=None):
     rclpy.init(args=args)
     node = LineFollower()
     try:
-        rclpy.spin(node)
+        while rclpy.ok() and not node._done:
+            rclpy.spin_once(node, timeout_sec=0.1)
     except KeyboardInterrupt:
         pass
     finally:
+        exit_code = node._exit_code
         node.destroy_node()
         rclpy.shutdown()
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
