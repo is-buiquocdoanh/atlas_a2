@@ -42,7 +42,7 @@ Type=simple
 User=$USER_NAME
 Group=$USER_NAME
 Environment="HOME=$USER_HOME"
-Environment="ROS_DOMAIN_ID=0"
+Environment="ROS_DOMAIN_ID=04"
 ExecStart=$WORKSPACE/setup/start_bringup.sh
 Restart=on-failure
 RestartSec=5
