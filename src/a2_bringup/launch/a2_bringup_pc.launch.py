@@ -115,6 +115,13 @@ def generate_launch_description():
         )
     )
     
+    # app PC
+    app_pc_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('atlas_app'), 'launch', 'atlas_app.launch.py')
+        )
+    )
+    
     return LaunchDescription([
         # platform_launch,
         robot_state_publisher,
@@ -127,4 +134,5 @@ def generate_launch_description():
         joy_launch,
         # driver_node,
         api_launch,
+        app_pc_launch,
     ])

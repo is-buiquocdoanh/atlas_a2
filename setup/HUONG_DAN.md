@@ -96,14 +96,28 @@ bash ~/atlas_a2/setup/start_app_robot.sh
 
 ---
 
-## Khi đổi IP mạng (robot hoặc PC đổi IP)
+## Khi đổi IP mạng hoặc ROS_DOMAIN_ID
 
-Chỉ cần sửa 1 dòng trong `setup/start_app_robot.sh`:
+Chỉnh 2 biến rồi paste toàn bộ vào terminal (SSH vào robot):
+
 ```bash
-API_HOST="<IP mới của PC>:8080"
+# ── Chỉnh 2 dòng này rồi paste toàn bộ ──────────────────────────
+API_HOST="192.168.x.xxx:8080"
+DOMAIN_ID=4
+# ─────────────────────────────────────────────────────────────────
+
+sed -i "s|API_HOST=.*|API_HOST=\"${API_HOST}\"|" ~/atlas_a2/setup/start_app_robot.sh
+sed -i "s|Environment=\"ROS_DOMAIN_ID=.*\"|Environment=\"ROS_DOMAIN_ID=${DOMAIN_ID}\"|" ~/atlas_a2/setup/install.sh
+
+echo "API_HOST  → $(grep 'API_HOST=' ~/atlas_a2/setup/start_app_robot.sh | head -1)"
+echo "DOMAIN_ID → $(grep 'ROS_DOMAIN_ID' ~/atlas_a2/setup/install.sh)"
 ```
 
-Không cần chạy lại `install.sh`.
+Sau khi chạy sẽ in ra 2 dòng xác nhận giá trị đã được ghi.
+
+> **Lưu ý:**
+> - Nếu chỉ đổi `API_HOST` thì **không cần** chạy lại `install.sh`.
+> - Nếu đổi `DOMAIN_ID` thì cần chạy lại `sudo bash ~/atlas_a2/setup/install.sh` để cập nhật service.
 
 ---
 
