@@ -46,11 +46,15 @@ cd ~/atlas_a2
 sudo bash setup/install.sh
 ```
 
-Script tự động:
-- Tạo systemd service `atlas-bringup` → bringup tự chạy khi boot
-- Tạo autostart `~/.config/autostart/atlas-app-robot.desktop` → app robot tự mở khi đăng nhập desktop
-- Tạo shortcut `~/Desktop/Atlas_A2` → click để mở app thủ công
-- Thêm user vào group `dialout` và `plugdev` (cần để truy cập cổng serial/USB)
+Script sẽ hỏi chọn chế độ cài đặt:
+
+| Lựa chọn | Mô tả |
+|-----------|-------|
+| **1** | Chỉ Bringup — tạo systemd service `atlas-bringup`, tự chạy khi boot |
+| **2** | Chỉ App Robot — tạo autostart desktop + shortcut, tự mở khi đăng nhập |
+| **3** | Cả hai — cài đồng thời Bringup + App Robot |
+
+Ngoài ra, script luôn tự động thêm user vào group `dialout` và `plugdev` (cần để truy cập cổng serial/USB).
 
 ---
 
