@@ -1,6 +1,7 @@
 #!/bin/bash
 # Tự tìm workspace từ vị trí file này — không cần chỉnh đường dẫn cứng
-WORKSPACE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── CẤU HÌNH: chỉnh IP của PC đang chạy atlas_api ───────────────────────────
 API_HOST="192.168.2.102:8080"

@@ -95,10 +95,10 @@ if $INSTALL_APP; then
 [Desktop Entry]
 Type=Application
 Name=Atlas A2 Robot App
-Exec=$WORKSPACE/setup/start_app_robot.sh
+Exec=bash $WORKSPACE/setup/start_app_robot.sh
 Terminal=false
 X-GNOME-Autostart-enabled=true
-X-GNOME-Autostart-Delay=8
+X-GNOME-Autostart-Delay=10
 EOF
     chown "$USER_NAME:$USER_NAME" "$AUTOSTART_DIR/atlas-app-robot.desktop"
     echo "      OK — app sẽ tự khởi động khi đăng nhập desktop"
@@ -112,7 +112,7 @@ EOF
 Type=Application
 Name=Atlas A2
 Comment=Mở ứng dụng điều khiển Atlas A2
-Exec=$WORKSPACE/setup/start_app_robot.sh
+Exec=bash $WORKSPACE/setup/start_app_robot.sh
 Terminal=false
 StartupNotify=true
 EOF
