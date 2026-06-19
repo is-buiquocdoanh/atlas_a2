@@ -118,6 +118,9 @@ StartupNotify=true
 EOF
     chown "$USER_NAME:$USER_NAME" "$DESKTOP_DIR/Atlas_A2.desktop"
     chmod +x "$DESKTOP_DIR/Atlas_A2.desktop"
+    # GNOME 42+ yêu cầu trust để click icon trên Desktop
+    sudo -u "$USER_NAME" dbus-launch gio set \
+        "$DESKTOP_DIR/Atlas_A2.desktop" metadata::trusted true 2>/dev/null || true
     echo "      OK — icon tại ~/Desktop/Atlas_A2"
 fi
 
