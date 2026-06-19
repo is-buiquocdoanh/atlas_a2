@@ -106,8 +106,8 @@ Chỉnh 2 biến rồi paste toàn bộ vào terminal (SSH vào robot):
 
 ```bash
 # ── Chỉnh 2 dòng này rồi paste toàn bộ ──────────────────────────
-API_HOST="192.168.x.xxx:8080"
-DOMAIN_ID=4
+API_HOST="192.168.0.100:8080"
+DOMAIN_ID=3
 # ─────────────────────────────────────────────────────────────────
 
 sed -i "s|API_HOST=.*|API_HOST=\"${API_HOST}\"|" ~/atlas_a2/setup/start_app_robot.sh

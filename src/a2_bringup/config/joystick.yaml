@@ -11,7 +11,7 @@ teleop_node:
     scale_linear:
       x: 0.2
     scale_linear_turbo:
-      x: 0.5
+      x: 0.8
     axis_angular:
       yaw: 0
     scale_angular:
